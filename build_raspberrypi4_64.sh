@@ -30,6 +30,8 @@ echo "Updating meadow_web in overlay folder"
 MEADOW_WEB_PATH="$REPO_DIR/buildroot_files/overlay/usr/share/meadow_web"
 MEADOW_WEB_SRC_PATH="$REPO_DIR/meadow_web_src"
 rm -rf $MEADOW_WEB_PATH
+# Make sure buildroot_files/overlay/usr/share/ exists
+mkdir -p $REPO_DIR/buildroot_files/overlay/usr/share/
 cp -r $MEADOW_WEB_SRC_PATH $MEADOW_WEB_PATH
 
 # ---- Buildroot Config ----
