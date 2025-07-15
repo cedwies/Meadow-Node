@@ -1,0 +1,1 @@
+tor -1 tor -1 * /var/lib/tor /bin/false - Tor user

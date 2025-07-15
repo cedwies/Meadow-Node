@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Basic setup for charset and responsive layout -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meadow Web</title>
+
+    <!-- Link to static CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Meadow Web</h1>
+
+            <!-- Show Tor address if available -->
+            {% if tor_address %}
+            <div class="tor-address">
+                <strong>Tor Address:</strong> {{ tor_address }}
+            </div>
+            {% endif %}
+
+            <!-- Display current connection type visually -->
+            <div class="connection-status {% if is_tor %}tor-connected{% else %}tor-not-connected{% endif %}">
+                {% if is_tor %}
+                    ✅ Connected via Tor, communication encrypted
+                {% else %}
+                    ❌ Not connected via Tor, communication unencrypted
+                {% endif %}
+            </div>
+        </header>
+
+        <main>
+            <!-- Display flash messages (like login success/fail, errors, etc.) -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Page-specific content will get inserted here -->
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer>
+            <!-- A tiny bit of branding at the bottom -->
+            <p>Meadow Web &copy; 2025</p>
+        </footer>
+    </div>
+</body>
+</html>

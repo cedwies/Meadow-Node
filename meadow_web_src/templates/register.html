@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-box">
+        <h2>Create Admin Account</h2>
+        
+        <!-- This message only shows for the first-time setup -->
+        <p class="text-center">This is the first-time setup. Please create an admin account.</p>
+        
+        <!-- Registration form posts to the /register route -->
+        <form method="POST" action="{{ url_for('auth.register') }}">
+            <div class="form-group">
+                <!-- Username field – we’re assuming admin can pick whatever they want -->
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <!-- Password field (obviously hidden) -->
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <div class="form-group">
+                <!-- Confirm field just to make sure user didn't fat-finger the password -->
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required>
+            </div>
+            
+            <!-- Big ol’ “let’s do this” button -->
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">
+                    Create Account
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

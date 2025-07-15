@@ -1,0 +1,122 @@
+#!/bin/sh
+# format-largest-device.sh – on a Pi booted from SD, find the largest non-root disk
+# (USB, NVMe, SATA, etc.), wipe it, create one optimally-aligned ext4 partition labeled "data",
+# mount it at /data, and update /etc/fstab accordingly.
+
+#!/bin/sh
+
+FLAG_FILE=/etc/boot_flags/data_partition.done
+
+if [ -f "$FLAG_FILE" ]; then
+  echo "[init] Firstboot script already run; mounting..."
+  mount /dev/disk/by-label/data /data
+  echo "mounted. Exiting..."
+  exit 0
+fi
+
+set -e
+
+log() {
+  echo "$(date +'%F %T') [format-largest-device] $*" >&2
+}
+
+# 1) Ensure running as root
+[ "$(id -u)" = 0 ] || { log "ERROR: must run as root"; exit 1; }
+
+# 2) Detect the device mounted at /
+rootdev=$(mount | awk '$3=="/"{print $1; exit}')
+if [ "$rootdev" = "/dev/root" ] || [ -z "$rootdev" ]; then
+  log "Root appears as /dev/root; checking /proc/cmdline"
+  for tok in $(tr ' ' '\n' </proc/cmdline); do
+    case $tok in root=*) rootdev=${tok#root=} ; break ;; esac
+  done
+fi
+[ -b "$rootdev" ] || { log "ERROR: root device '$rootdev' not found"; exit 1; }
+log "Root device: $rootdev"
+
+# 3) Strip trailing partition number to get base device name
+rootbase=$(basename "$rootdev" | sed -E 's/p?[0-9]+$//')
+
+# 4) Find the largest non-root block device
+max=0
+selected=""
+for path in /sys/block/*; do
+  dev=$(basename "$path")
+  case "$dev" in
+    loop*|ram*|sr*|dm-*) continue ;;  # skip loops, ram, CD-ROM, device-mapper
+    "$rootbase")      continue ;;  # skip the boot device
+  esac
+  [ -b "/dev/$dev" ] || continue
+  size=$(cat "$path/size" 2>/dev/null || echo 0)
+  if [ "$size" -gt "$max" ]; then
+    max=$size
+    selected=$dev
+  fi
+done
+
+if [ -z "$selected" ]; then
+  log "No non-root disks found; exiting."
+  exit 1
+fi
+
+device="/dev/$selected"
+log "Selected device: $device (${max} sectors)"
+
+# 5) Unmount any partitions on the selected device
+for part in $(ls "${device}"* 2>/dev/null); do
+  if mount | grep -q "^$part "; then
+    log "Unmounting $part"
+    umount "$part"
+  fi
+done
+
+# 6) Wipe existing partition table and create a new GPT
+log "Creating new GPT on $device"
+parted -s "$device" mklabel gpt
+
+# 7) Create a single ext4 partition, aligned to 1 MiB
+log "Creating single ext4 partition (1MiB–100%)"
+parted -s -a optimal "$device" mkpart primary ext4 1MiB 100%
+
+# 8) Re-read the partition table
+log "Re-reading partition table"
+partprobe "$device"
+
+# 9) Determine partition suffix ("p" for mmcblk/NVMe, "" for sda, etc.)
+case "$selected" in
+  *[0-9]) suffix="p" ;;  # e.g. mmcblk0 → mmcblk0p1
+  *)        suffix=""  ;;  # e.g. sda → sda1
+esac
+newpart="${device}${suffix}1"
+
+# Wait for the new partition node to appear
+for i in 1 2 3 4 5; do
+  if [ -b "$newpart" ]; then
+    log "Detected new partition: $newpart"
+    break
+  fi
+  sleep 1
+done
+[ -b "$newpart" ] || { log "ERROR: $newpart did not appear"; exit 1; }
+
+# 10) Format as ext4 and label it 'data'
+log "Formatting $newpart as ext4 (label=data)"
+mkfs.ext4 -F -L data "$newpart"
+
+# 11) Update /etc/fstab to mount the new partition on /data
+log "Updating /etc/fstab"
+tmpfstab=$(mktemp)
+grep -v '[[:space:]]/data[[:space:]]' /etc/fstab >"$tmpfstab"
+printf "LABEL=data\t/data\text4\tdefaults\t0 2\n" >>"$tmpfstab"
+mv "$tmpfstab" /etc/fstab
+
+# 12) Mount it now
+log "Mounting /data"
+mkdir -p /data
+mount "$newpart" /data
+
+# Mark as completed
+touch "$FLAG_FILE"
+
+log "Done: $newpart → /data"
+

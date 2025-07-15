@@ -1,0 +1,15 @@
+#!/bin/sh
+
+case "$1" in
+  start)
+    echo "Starting Meadow Web..."
+    /usr/bin/python3 /usr/share/meadow_web/app.py &
+    ;;
+  stop)
+    echo "Stopping Meadow Web..."
+    killall python3
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+esac
